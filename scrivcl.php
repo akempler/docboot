@@ -40,5 +40,15 @@ if (!copy($file, $convertpath.'/js/scrivstrap.js')) {
   echo "failed to copy $file...\n\n";
 }
 
+// Copy the docboot.css file to the converted directory.
+$file = './css/docboot.css';
+$oldumask = umask(0);
+mkdir($convertpath.'/css', 0777); // or even 01777 so you get the sticky bit set
+umask($oldumask);
+
+if (!copy($file, $convertpath.'/css/docboot.css')) {
+  echo "failed to copy $file...\n\n";
+}
+
 
 echo"done";

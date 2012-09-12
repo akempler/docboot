@@ -8,6 +8,7 @@ You can then click on any of the contents items to automatically display the pag
 
 USAGE:
 > php scrivcl.php path\to\your\document.html path\to\target\directory\ doctype
+
 Note the trailing slash on the target directory.
 
 doctype can be either 'word' or 'scrivener'
