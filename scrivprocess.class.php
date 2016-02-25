@@ -316,14 +316,15 @@ class ScrivProcess {
     $h2s = $this->doc->getElementsByTagName('h2');
     $i = $h2s->length;
     while ($i >= 0) {
+
       $h2 = $h2s->item($i);
       if($h2) {
         $newh2 = $this->doc->createElement('h2', $h2->nodeValue);
         $h2Attribute = $this->doc->createAttribute('id');
         $h2Attribute->value = 'h2_'.$i;
-        $newh2->appendChild($h1Attribute);
+        $newh2->appendChild($h2Attribute);
 
-        $h2->parentNode->replaceChild($newh1, $h2);
+        $h2->parentNode->replaceChild($newh2, $h2);
       }
       $i--;
     }
