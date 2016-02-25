@@ -54,7 +54,7 @@ class ScrivProcess {
    * @var string
    * @access protected
    */
-  protected $doc_title = '';
+  public $doc_title = '';
 
   /**
    * The author to use for the converted document.
@@ -62,7 +62,7 @@ class ScrivProcess {
    * @var string
    * @access protected
    */
-  protected $doc_author = '';
+  public $doc_author = '';
 
   /**
    * The SimpleXML represenation of the file.
@@ -89,8 +89,6 @@ class ScrivProcess {
 
 
 
-
-
   /**
    * Constructor
    * @param string $type - 'word' or 'scrivener'
@@ -103,9 +101,6 @@ class ScrivProcess {
   }
 
 
-
-
-
   /**
    * Parse and convert a file to a Twitter Bootstrap based html document.
    *
@@ -114,27 +109,23 @@ class ScrivProcess {
    */
   public function convert_file($filepath) {
 
-  	$this->original_filepath = $filepath;
+    $this->original_filepath = $filepath;
   	if (isset($_SERVER['WINDIR']) || isset($_SERVER['windir'])) {
   	  $pieces = explode('\\', $filepath);
   	} else {
   	  $pieces = explode('/', $filepath);
   	}
-  	$this->filename = array_pop($pieces);
+    $this->filename = array_pop($pieces);
   	//print" filename=".$this->filename." ";
 
-  	$this->import_file();
+    $this->import_file();
 
-  	$this->parse_doc_title();
+    $this->strip_file();
 
-	$this->strip_file();
+    // Wrap the scrivener export in the template
+    $this->add_template();
 
-	// TODO handle failure
-	// Wrap the scrivener export in the tempate
-	$this->add_template();
-
-
-  	 return $this->converted_filepath;
+    return $this->converted_filepath;
   }
 
 
@@ -172,9 +163,8 @@ class ScrivProcess {
    * @access protected
    */
   protected function import_file() {
-
   	// Read in the file
-	if(file_exists($this->original_filepath)) {
+    if(file_exists($this->original_filepath)) {
       $html = file_get_contents($this->original_filepath);
       if (!$html) {
         ScrivMsg::set_message('error', "There was an error processing the file. The errors reported were:");
@@ -195,26 +185,26 @@ class ScrivProcess {
     // TODO poor placement of this
     $html = $this->raw_cleanup($html);
 
+    $html_dom = new DOMDocument();
+    $html_dom->preserveWhiteSpace = false;
+    libxml_use_internal_errors(true);
+    $html_dom->loadHTML($html);
+    $this->doc = $html_dom;
 
-  	$html_dom = new DOMDocument();
-  	$dom->preserveWhiteSpace = false;
-  	$html_dom->loadHTML($html);
-  	$this->doc = $html_dom;
+    $xml = $html_dom->saveXML();
+    //$doc = new DOMDocument();
+    //@$doc->loadXML($xml, LIBXML_NOXMLDECL);
+    //$this->sxml = simplexml_import_dom($doc);
+    $this->sxml = simplexml_load_string($xml);
 
-  	$xml = $html_dom->saveXML();
-	//$doc = new DOMDocument();
-	//@$doc->loadXML($xml, LIBXML_NOXMLDECL);
-	//$this->sxml = simplexml_import_dom($doc);
-	$this->sxml = simplexml_load_string($xml);
-
-	if (!$this->sxml) {
+    if (!$this->sxml) {
       ScrivMsg::set_message('error', "There was an error processing the file. The errors reported were:");
       foreach(libxml_get_errors() as $error) {
         ScrivMsg::set_message('error', $error->message);
       }
       return FALSE;
     } else {
- 		return TRUE;
+      return TRUE;
     }
   }
 
@@ -225,30 +215,11 @@ class ScrivProcess {
    */
   protected function raw_cleanup($html) {
     // Get rid of Windows style carriage returns.
-    //    domdocument will convert them to &#13;
+    // domdocument will convert them to &#13;
     $html = preg_replace('/\r\n/', "\n", $html);
+    $html = str_replace('<img src="', '<img src="./img/', $html);
+    //$html = str_replace('<meta charset="utf-8"/>', '', $html);
     return $html;
-  }
-
-
-
-  /**
-   * Parse out the document title.
-   * For Scrivener html -> markdown export this is in the <title> element inside of the <head>
-   *
-   * @access protected
-   * @todo separate out the author parsing.
-   */
-  protected function parse_doc_title() {
-
-	$this->doc_title = $this->sxml->head->title;
-	// TODO this assumes that the meta tag containing the author is the second tag which is not the case for Word.
-	// Should look for the meta tag that has an attribute of 'name' with a value of 'author'
-	// <meta name="author" content="Adam Kempler"/>
-	// NOTE: this is not set for Word. Possibly provide a field.
-	// TODO check if it is set.
-	//		also need to check that that is the author! Might be set but not author.
-	$this->doc_author = $this->sxml->head->meta[1]['content'];
   }
 
 
@@ -257,25 +228,21 @@ class ScrivProcess {
    * Load the file and resave with only the content inside the body tags.
    * @return boolean - true if the file was converted successfully, otherwise false.
    * @access protected
-   * @todo possibly save to variable instead of file.
    */
   protected function strip_file() {
-    // TODO this shouldn't happen here.
+
     $this->converted_filepath = $this->converted_path . $this->filename;
 
-	if($this->exporttype == 'word') {
-		$this->clean_word();
-	}
+    if($this->exporttype == 'word') {
+    	$this->clean_word();
+    }
 
-	$this->sxml = simplexml_import_dom($this->doc);
-
+    $this->sxml = simplexml_import_dom($this->doc);
     // Save just the content in the body. We'll add our own html head.
     $this->sxml->body->asXML($this->converted_filepath);
-
     $this->remove_elements();
 
-	return TRUE;
-
+    return TRUE;
   }
 
 
@@ -298,35 +265,32 @@ class ScrivProcess {
   }
 
 
-
-
   /**
    * Cleanup a Word file
    *
    * @access protected
-   * @todo move the individual items to separate methods.
-   *     That way someone could override the clean_word method and change what cleaning is done easier.
+   * @todo Break into multiple methods that can be overridden.
    */
   protected function clean_word() {
 
     $sxml = simplexml_import_dom($this->doc);
 
-  	// Remove the table of contents
-  	$nodes = $sxml->xpath('//p[@class="MsoToc1"]');
-	$nodes = array_merge($nodes, $sxml->xpath('//p[@class="MsoToc2"]'));
-	$nodes = array_merge($nodes, $sxml->xpath('//p[@class="MsoToc3"]'));
-	$nodes = array_merge($nodes, $sxml->xpath('//p[@class="MsoTocHeading"]'));
+    // Remove the table of contents
+    $nodes = $sxml->xpath('//p[@class="MsoToc1"]');
+    $nodes = array_merge($nodes, $sxml->xpath('//p[@class="MsoToc2"]'));
+    $nodes = array_merge($nodes, $sxml->xpath('//p[@class="MsoToc3"]'));
+    $nodes = array_merge($nodes, $sxml->xpath('//p[@class="MsoTocHeading"]'));
 
-	// NOTE, doing this updates the sxml object. Nice.
-	foreach($nodes as $toc) {
-		$dom = dom_import_simplexml($toc);
-		if(!$dom) {
-		  // TODO set appropriate msg
-			echo"Error converting xml";
-		} else {
-			$dom->parentNode->removeChild($dom);
-		}
-	}
+    // NOTE, doing this updates the sxml object.
+    foreach($nodes as $toc) {
+      $dom = dom_import_simplexml($toc);
+      if(!$dom) {
+        // TODO set appropriate msg
+        echo"Error converting xml";
+      } else {
+        $dom->parentNode->removeChild($dom);
+      }
+    }
 
     // Add ids to the h1 tags so they can serve as navigation.
     // This is done by creating a new h1 element and replacing the existing one.
@@ -336,10 +300,8 @@ class ScrivProcess {
     $h1s = $this->doc->getElementsByTagName('h1');
     $i = $h1s->length;
     while ($i >= 0) {
-
       $h1 = $h1s->item($i);
       if($h1) {
-        //$newh1 = $html_dom->createTextNode($h1->nodeValue);
         $newh1 = $this->doc->createElement('h1', $h1->nodeValue);
         // manually create ids for the h1 elements since Word does not provide them.
         $h1Attribute = $this->doc->createAttribute('id');
@@ -348,22 +310,30 @@ class ScrivProcess {
 
         $h1->parentNode->replaceChild($newh1, $h1);
       }
-
       $i--;
     }
 
+    $h2s = $this->doc->getElementsByTagName('h2');
+    $i = $h2s->length;
+    while ($i >= 0) {
+      $h2 = $h2s->item($i);
+      if($h2) {
+        $newh2 = $this->doc->createElement('h2', $h2->nodeValue);
+        $h2Attribute = $this->doc->createAttribute('id');
+        $h2Attribute->value = 'h2_'.$i;
+        $newh2->appendChild($h1Attribute);
 
-    // TODO don't do this here. Just use a preg_replace instead of the str_replace currently used on <body> and create a regex.
-	$bodies = $this->doc->getElementsByTagName("body");
-	foreach($bodies as $body) {
-		//foreach($body->attributes as $att) {
-			//$body->removeAttributeNode($att);
+        $h2->parentNode->replaceChild($newh1, $h2);
+      }
+      $i--;
+    }
+
+    $bodies = $this->doc->getElementsByTagName("body");
+    foreach($bodies as $body) {
 			$body->removeAttribute('lang');
 			$body->removeAttribute('link');
 			$body->removeAttribute('vlink');
-		//}
-	}
-
+    }
   } // END clean_word()
 
 
@@ -376,15 +346,14 @@ class ScrivProcess {
   protected function add_template($template='template1') {
 
   	$html = file_get_contents($this->template_path.$template.'_top.html');
-  	$html = str_replace("%title%", $this->doc_title, $html);
-  	$html = str_replace("%author%", '<p>'.$this->doc_author.'</p>', $html);
+  	$html = str_replace("%page_heading%", $this->doc_title, $html);
+  	$html = str_replace("%document_title%", $this->doc_title, $html);
+  	$html = str_replace("%author%", $this->doc_author, $html);
   	$html .= file_get_contents($this->converted_filepath);
   	$html .= file_get_contents($this->template_path.$template.'_bottom.html');
 
   	file_put_contents($this->converted_filepath, $html);
   }
-
-
 
 
 

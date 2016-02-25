@@ -14,12 +14,15 @@ if (PHP_SAPI != 'cli') {
 require_once('scrivmsg.class.php');
 require_once('scrivprocess.class.php');
 
-// getopt only works in php 5.3+
-//$args = getopt("f:d:t");
 
 $filetype = $argv[3]; // 'word' or 'scrivener'
 
 $ScrivProcess = new ScrivProcess($filetype);
+
+$docName = $argv[4];
+$author = $argv[5];
+$ScrivProcess->doc_title = $docName;
+$ScrivProcess->doc_author = $author;
 
 $convertpath = $argv[2];
 // TODO make the directory if it does not exist?
@@ -33,7 +36,7 @@ $ScrivProcess->convert_file($filepath);
 // Copy the scrivstrap.js file to the converted directory.
 $file = './js/scrivstrap.js';
 $oldumask = umask(0);
-mkdir($convertpath.'/js', 0777); // or even 01777 so you get the sticky bit set
+mkdir($convertpath.'/js', 0777);
 umask($oldumask);
 
 if (!copy($file, $convertpath.'/js/scrivstrap.js')) {
@@ -43,7 +46,7 @@ if (!copy($file, $convertpath.'/js/scrivstrap.js')) {
 // Copy the docboot.css file to the converted directory.
 $file = './css/docboot.css';
 $oldumask = umask(0);
-mkdir($convertpath.'/css', 0777); // or even 01777 so you get the sticky bit set
+mkdir($convertpath.'/css', 0777);
 umask($oldumask);
 
 if (!copy($file, $convertpath.'/css/docboot.css')) {
